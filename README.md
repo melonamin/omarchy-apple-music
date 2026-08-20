@@ -94,6 +94,12 @@ node --test tests/model.test.js tests/extension.test.js tests/player-model.test.
 tests/integration.sh
 ```
 
-The model suites cover window matching, scaled monitor geometry, every bar edge, small displays, PID-scoped MPRIS selection, palette validation, and derived interaction colors. The integration script validates both manifests and reads live shell/compositor state without launching or closing Apple Music.
+The model suites cover window matching, scaled monitor geometry, every bar edge, small displays, PID-scoped MPRIS selection, palette validation, and derived interaction colors. The integration script validates both manifests and reads live shell/compositor state; by default it stays hands-off and never launches or closes Apple Music.
+
+```bash
+OMARCHY_APPLE_MUSIC_E2E=1 tests/integration.sh
+```
+
+The opt-in run additionally launches a disposable Apple Music window in a temporary browser profile, parks it on the special workspace, and closes it again. It skips itself when an Apple Music window is already open, so it never disturbs a real session.
 
 Apple and Apple Music are trademarks of Apple Inc. This project is independent and is not endorsed by or affiliated with Apple.
