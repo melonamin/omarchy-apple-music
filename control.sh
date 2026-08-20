@@ -9,6 +9,7 @@ APPLE_MUSIC_URL="https://music.apple.com"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-apple-music"
 PROFILE_DIR="$DATA_DIR/chromium"
 EXTENSION_DIR="$DATA_DIR/extension"
+DEFAULT_ZOOM_LEVEL="-0.5778829311823857"
 
 write_theme_file() {
   local background=$1 foreground=$2 border=$3 accent=$4 muted=$5 urgent=$6 mode=$7
@@ -46,13 +47,38 @@ prepare_extension() {
   local name
   umask 077
   mkdir -p "$EXTENSION_DIR"
-  for name in manifest.json theme-model.js content.js content.css; do
+  for name in manifest.json theme-model.js player-model.js player-bridge.js content.js content.css; do
     install -m 0644 "$ROOT/extension/$name" "$EXTENSION_DIR/$name"
   done
 
   if [[ ! -f $EXTENSION_DIR/theme.json ]]; then
     write_theme_file "#1f1f1f" "#f5f5f7" "#555555" "#fa586a" "#98989d" "#ff453a" "dark" >/dev/null
   fi
+}
+
+configure_profile() {
+  local preferences="$PROFILE_DIR/Default/Preferences" current tmp
+  umask 077
+  mkdir -p "$PROFILE_DIR/Default"
+
+  if [[ -f $preferences ]]; then
+    current=$(jq -r '.partition.default_zoom_level.x // empty' "$preferences")
+    [[ $current == $DEFAULT_ZOOM_LEVEL ]] && return
+    tmp=$(mktemp "$PROFILE_DIR/Default/.Preferences.XXXXXX")
+    if ! jq --argjson level "$DEFAULT_ZOOM_LEVEL" '.partition.default_zoom_level.x = $level' "$preferences" >"$tmp"; then
+      rm -f -- "$tmp"
+      return 1
+    fi
+  else
+    tmp=$(mktemp "$PROFILE_DIR/Default/.Preferences.XXXXXX")
+    if ! jq -n --argjson level "$DEFAULT_ZOOM_LEVEL" '{partition: {default_zoom_level: {x: $level}}}' >"$tmp"; then
+      rm -f -- "$tmp"
+      return 1
+    fi
+  fi
+
+  chmod 0600 "$tmp"
+  mv -f -- "$tmp" "$preferences"
 }
 
 publish_theme() {
@@ -146,8 +172,7 @@ launch() {
   unit="omarchy-apple-music-$(date +%s%N)"
 
   prepare_extension
-  umask 077
-  mkdir -p "$PROFILE_DIR"
+  configure_profile
 
   systemd-run --user --quiet --collect --unit="$unit" \
     --property=StandardOutput=null --property=StandardError=null \

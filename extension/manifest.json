@@ -1,9 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Omarchy Apple Music Theme",
-  "version": "0.1.0",
-  "description": "Applies the active Omarchy palette to music.apple.com.",
+  "name": "Omarchy Apple Music",
+  "version": "0.1.2",
+  "description": "Adds an Omarchy-themed compact player and full-view switch to music.apple.com.",
+  "permissions": [
+    "storage"
+  ],
   "content_scripts": [
+    {
+      "matches": [
+        "https://music.apple.com/*"
+      ],
+      "js": [
+        "player-model.js",
+        "player-bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": [
         "https://music.apple.com/*"

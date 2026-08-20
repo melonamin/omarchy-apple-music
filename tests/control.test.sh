@@ -51,7 +51,7 @@ revision=$(XDG_DATA_HOME="$TEST_DIR/data" "$ROOT/control.sh" theme \
 [[ $revision =~ ^[0-9]+$ ]]
 
 RUNTIME_EXTENSION="$TEST_DIR/data/omarchy-apple-music/extension"
-for name in manifest.json theme-model.js content.js content.css theme.json; do
+for name in manifest.json theme-model.js player-model.js player-bridge.js content.js content.css theme.json; do
   [[ -f $RUNTIME_EXTENSION/$name ]]
 done
 jq -e --arg revision "$revision" '
@@ -68,6 +68,24 @@ jq -e --arg revision "$revision" '
 
 grep -F 'load_extension_paths' "$ROOT/control.sh" >/dev/null
 grep -F 'chromium-flags.conf' "$ROOT/control.sh" >/dev/null
+
+MOCK_SYSTEMD_RUN="$TEST_DIR/systemd-run"
+cat >"$MOCK_SYSTEMD_RUN" <<'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+chmod +x "$MOCK_SYSTEMD_RUN"
+
+MOCK_CHROMIUM="$TEST_DIR/chromium"
+cat >"$MOCK_CHROMIUM" <<'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+chmod +x "$MOCK_CHROMIUM"
+
+XDG_DATA_HOME="$TEST_DIR/launch-data" PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" launch
+PROFILE_PREFERENCES="$TEST_DIR/launch-data/omarchy-apple-music/chromium/Default/Preferences"
+jq -e '.partition.default_zoom_level.x == -0.5778829311823857' "$PROFILE_PREFERENCES" >/dev/null
 
 if XDG_DATA_HOME="$TEST_DIR/data" "$ROOT/control.sh" theme \
   red '#c2c2b0' '#78824b' '#78824b' '#666666' '#685742' dark 2>/dev/null; then
