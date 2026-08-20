@@ -73,6 +73,7 @@ Item {
   property int launchAttempts: 0
   property var launchAnchor: null
   property string actionKind: ""
+  property string initializedFor: ""
 
   function colorByte(value) {
     var byte = Math.max(0, Math.min(255, Math.round(Number(value) * 255)))
@@ -219,10 +220,6 @@ Item {
         launchPoll.stop()
         launching = false
         showExisting(state.client, state.monitors, launchAnchor)
-      } else if (launchAttempts >= 40) {
-        launchPoll.stop()
-        launching = false
-        notifyFailure("Chromium did not create the Apple Music window")
       }
     }
   }
@@ -397,17 +394,18 @@ Item {
     }
   }
 
-  onControlPathChanged: {
-    if (!controlPath) return
+  function initialize() {
+    if (!controlPath || initializedFor === controlPath) return
+    initializedFor = controlPath
     syncTheme(true)
     installRules(false)
     requestState("sync", null)
   }
 
+  onControlPathChanged: initialize()
+
   Component.onCompleted: Qt.callLater(function() {
-    syncTheme(true)
-    installRules(false)
-    requestState("sync", null)
+    root.initialize()
   })
 
   Process {
@@ -512,6 +510,13 @@ Item {
     interval: 250
     repeat: true
     onTriggered: {
+      // Timeout lives here so it fires even when `control.sh state` keeps failing.
+      if (root.launchAttempts >= 40) {
+        launchPoll.stop()
+        root.launching = false
+        root.notifyFailure("Chromium did not create the Apple Music window")
+        return
+      }
       root.launchAttempts++
       root.requestState("awaitLaunch", root.launchAnchor)
     }
