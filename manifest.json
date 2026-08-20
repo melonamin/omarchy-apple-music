@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "melonamin.apple-music",
   "name": "Apple Music",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "melonamin",
   "description": "Apple Music as a persistent, bar-anchored Chromium app window.",
   "homepage": "https://github.com/melonamin/omarchy-apple-music",

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Omarchy Apple Music",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Adds an Omarchy-themed compact player and full-view switch to music.apple.com.",
   "permissions": [
     "storage"
