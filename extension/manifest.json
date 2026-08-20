@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Omarchy Apple Music Theme",
+  "version": "0.1.0",
+  "description": "Applies the active Omarchy palette to music.apple.com.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://music.apple.com/*"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "theme-model.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "theme.json"
+      ],
+      "matches": [
+        "https://music.apple.com/*"
+      ]
+    }
+  ]
+}

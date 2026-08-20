@@ -59,6 +59,14 @@ test("click-away dismissal works after recovered or newly opened state", () => {
   assert.ok(M.shouldDismissWindow(true, "", "0xabc"))
 })
 
+test("theme transitions preserve and restore dropdown focus", () => {
+  assert.equal(M.focusDisposition(false, "0xdef", "0xabc", true), "keep")
+  assert.equal(M.focusDisposition(true, "0xabc", "0xabc", true), "keep")
+  assert.equal(M.focusDisposition(true, "", "0xabc", true), "restore")
+  assert.equal(M.focusDisposition(true, "0xdef", "0xabc", true), "restore")
+  assert.equal(M.focusDisposition(true, "0xdef", "0xabc", false), "dismiss")
+})
+
 test("scaled monitor geometry becomes a logical work area", () => {
   assert.deepEqual(M.monitorWorkArea(monitor), {
     x: 0,

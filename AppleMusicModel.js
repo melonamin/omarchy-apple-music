@@ -58,9 +58,14 @@ function selectWindow(clients) {
 }
 
 function shouldDismissWindow(opened, focusedAddress, windowAddress) {
+  return focusDisposition(opened, focusedAddress, windowAddress, false) === "dismiss"
+}
+
+function focusDisposition(opened, focusedAddress, windowAddress, preserveForTheme) {
   var window = normalizeAddress(windowAddress)
-  if (!opened || !window) return false
-  return normalizeAddress(focusedAddress) !== window
+  if (!opened || !window) return "keep"
+  if (normalizeAddress(focusedAddress) === window) return "keep"
+  return preserveForTheme ? "restore" : "dismiss"
 }
 
 function monitorFor(monitors, name) {
@@ -153,6 +158,7 @@ if (typeof module !== "undefined") {
     isAppleWindow: isAppleWindow,
     selectWindow: selectWindow,
     shouldDismissWindow: shouldDismissWindow,
+    focusDisposition: focusDisposition,
     monitorFor: monitorFor,
     monitorWorkArea: monitorWorkArea,
     placement: placement,

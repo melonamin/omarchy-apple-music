@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import qs.Commons
 import "AppleMusicModel.js" as Model
 
 Item {
@@ -24,7 +25,34 @@ Item {
   property var lastAnchor: null
   property var monitors: []
   property bool dismissArmed: false
+  property bool themeFocusLost: false
+  property bool themePickerOpen: false
+  property string pendingFocusAddress: ""
+  property double themeFocusUntil: 0
   property string lastError: ""
+  property bool themeReady: false
+  property bool themeQueued: false
+  property string themeError: ""
+  property string themeRevision: ""
+  property string publishedThemeSignature: ""
+  property string publishingThemeSignature: ""
+
+  readonly property string themeBackground: cssColor(Color.popups.background)
+  readonly property string themeForeground: cssColor(Color.popups.text)
+  readonly property string themeBorder: cssColor(Color.popups.border)
+  readonly property string themeAccent: cssColor(Color.accent)
+  readonly property string themeMuted: cssColor(Color.muted)
+  readonly property string themeUrgent: cssColor(Color.urgent)
+  readonly property string themeMode: colorLuminance(Color.popups.background) > 0.45 ? "light" : "dark"
+  readonly property string themeSignature: [
+    themeBackground,
+    themeForeground,
+    themeBorder,
+    themeAccent,
+    themeMuted,
+    themeUrgent,
+    themeMode
+  ].join("|")
 
   readonly property var players: Mpris.players ? Mpris.players.values : []
   readonly property var activePlayer: Model.playerForPid(players, browserPid)
@@ -45,6 +73,69 @@ Item {
   property int launchAttempts: 0
   property var launchAnchor: null
   property string actionKind: ""
+
+  function colorByte(value) {
+    var byte = Math.max(0, Math.min(255, Math.round(Number(value) * 255)))
+    var hex = byte.toString(16)
+    return hex.length < 2 ? "0" + hex : hex
+  }
+
+  function cssColor(value) {
+    return "#" + colorByte(value.r) + colorByte(value.g) + colorByte(value.b)
+  }
+
+  function colorChannelLuminance(value) {
+    var channel = Number(value)
+    return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4)
+  }
+
+  function colorLuminance(value) {
+    return 0.2126 * colorChannelLuminance(value.r)
+      + 0.7152 * colorChannelLuminance(value.g)
+      + 0.0722 * colorChannelLuminance(value.b)
+  }
+
+  function protectThemeFocus(duration) {
+    var milliseconds = Math.max(0, Number(duration || 2000))
+    themeFocusUntil = Math.max(themeFocusUntil, Date.now() + milliseconds)
+  }
+
+  function watchThemeTransition() {
+    protectThemeFocus(2000)
+    if (themeSettleProc.running || !controlPath) return
+    themeSettleProc.command = [controlPath, "wait-theme"]
+    themeSettleProc.running = true
+  }
+
+  function themeFocusProtected() {
+    return themePickerOpen || themeSettleProc.running || Date.now() < themeFocusUntil
+  }
+
+  function syncTheme(force) {
+    if (!controlPath) return
+    if (themeProc.running) {
+      themeQueued = true
+      return
+    }
+    if (!force && themeSignature === publishedThemeSignature) return
+
+    themeQueued = false
+    themeError = ""
+    themeRevision = ""
+    publishingThemeSignature = themeSignature
+    themeProc.command = [
+      controlPath,
+      "theme",
+      themeBackground,
+      themeForeground,
+      themeBorder,
+      themeAccent,
+      themeMuted,
+      themeUrgent,
+      themeMode
+    ]
+    themeProc.running = true
+  }
 
   function notifyFailure(message) {
     lastError = String(message || "Apple Music could not be opened")
@@ -94,6 +185,12 @@ Item {
     if (!opened) {
       dismissArmed = false
       dismissDelay.stop()
+      dismissFocusDelay.stop()
+      themeRefocusDelay.stop()
+      themeFocusLost = false
+      themePickerOpen = false
+      pendingFocusAddress = ""
+      themeFocusUntil = 0
     }
     ownerScreen = opened && state && state.openScreen ? String(state.openScreen) : ""
   }
@@ -132,6 +229,7 @@ Item {
 
   function launch(anchor) {
     if (launching || launchProc.running) return
+    syncTheme(false)
     launching = true
     lastError = ""
     launchAttempts = 0
@@ -181,6 +279,8 @@ Item {
   function hide() {
     if ((!opened && !windowAddress) || actionProc.running) return
     dismissArmed = false
+    dismissFocusDelay.stop()
+    pendingFocusAddress = ""
     actionKind = "hide"
     actionProc.command = [controlPath, "hide", windowAddress]
     actionProc.running = true
@@ -221,6 +321,29 @@ Item {
 
   function handleHyprlandEvent(event) {
     var name = String(event && event.name ? event.name : "")
+    if (name === "openlayer") {
+      var openedLayer = String(Model.eventParts(event, 1)[0] || "")
+      if (openedLayer === "omarchy-image-selector") {
+        themePickerOpen = true
+        themeFocusLost = opened
+        dismissFocusDelay.stop()
+        pendingFocusAddress = ""
+      }
+      return
+    }
+
+    if (name === "closelayer") {
+      var closedLayer = String(Model.eventParts(event, 1)[0] || "")
+      if (closedLayer === "omarchy-image-selector" && themePickerOpen) {
+        themePickerOpen = false
+        if (opened) {
+          watchThemeTransition()
+          themeRefocusDelay.restart()
+        }
+      }
+      return
+    }
+
     if (name === "configreloaded") {
       ruleReload.restart()
       return
@@ -239,26 +362,121 @@ Item {
         opened = false
         ownerScreen = ""
         dismissArmed = false
+        dismissFocusDelay.stop()
+        themeRefocusDelay.stop()
+        themeFocusLost = false
+        themePickerOpen = false
+        pendingFocusAddress = ""
+        themeFocusUntil = 0
       }
       return
     }
 
     if (name === "activewindowv2" && dismissArmed) {
       var focused = Model.normalizeAddress(Model.eventParts(event, 1)[0])
-      if (Model.shouldDismissWindow(opened, focused, windowAddress)) hide()
+      var disposition = Model.focusDisposition(
+        opened,
+        focused,
+        windowAddress,
+        themeFocusProtected()
+      )
+      if (disposition === "restore") {
+        dismissFocusDelay.stop()
+        pendingFocusAddress = ""
+        themeFocusLost = true
+        protectThemeFocus(12000)
+        if (!themePickerOpen) themeRefocusDelay.restart()
+      } else if (disposition === "dismiss") {
+        pendingFocusAddress = focused
+        dismissFocusDelay.restart()
+      } else {
+        dismissFocusDelay.stop()
+        pendingFocusAddress = ""
+        themeFocusLost = false
+      }
     }
   }
 
   onControlPathChanged: {
     if (!controlPath) return
+    syncTheme(true)
     installRules(false)
     requestState("sync", null)
   }
 
   Component.onCompleted: Qt.callLater(function() {
+    syncTheme(true)
     installRules(false)
     requestState("sync", null)
   })
+
+  Process {
+    id: themeProc
+    stdout: StdioCollector {
+      onStreamFinished: root.themeRevision = String(text || "").trim()
+    }
+    onExited: function(code) {
+      var shouldRepeat = root.themeQueued
+        || root.themeSignature !== root.publishingThemeSignature
+      if (code === 0) {
+        root.themeReady = true
+        root.themeError = ""
+        root.publishedThemeSignature = root.publishingThemeSignature
+      } else {
+        root.themeReady = false
+        root.themeError = "Could not publish the Omarchy palette"
+        console.warn("apple-music: could not publish browser theme")
+      }
+      root.publishingThemeSignature = ""
+      if (shouldRepeat) {
+        root.themeQueued = false
+        Qt.callLater(function() { root.syncTheme(false) })
+      }
+    }
+  }
+
+  Timer {
+    id: themeDebounce
+    interval: 25
+    onTriggered: root.syncTheme(false)
+  }
+
+  onThemeSignatureChanged: {
+    themeDebounce.restart()
+    if (opened) {
+      watchThemeTransition()
+      if (themeFocusLost && !themePickerOpen) themeRefocusDelay.restart()
+    }
+  }
+
+  Timer {
+    id: themeRefocusDelay
+    interval: 350
+    onTriggered: {
+      if (!root.themeFocusLost || !root.opened || !root.windowAddress) {
+        root.themeFocusLost = false
+        return
+      }
+      root.themeFocusLost = false
+      themeRefocusProc.command = [root.controlPath, "focus", root.windowAddress]
+      themeRefocusProc.running = true
+    }
+  }
+
+  Process {
+    id: themeSettleProc
+    onExited: {
+      root.protectThemeFocus(12000)
+      if (root.themeFocusLost && root.opened) themeRefocusDelay.restart()
+    }
+  }
+
+  Process {
+    id: themeRefocusProc
+    onExited: function(code) {
+      if (code !== 0) console.warn("apple-music: could not restore focus after theme change")
+    }
+  }
 
   Process {
     id: stateProc
@@ -328,6 +546,25 @@ Item {
   }
 
   Timer {
+    id: dismissFocusDelay
+    interval: 140
+    onTriggered: {
+      if (root.themeFocusProtected()) {
+        root.themeFocusLost = root.opened
+        root.protectThemeFocus(12000)
+        if (!root.themePickerOpen) themeRefocusDelay.restart()
+      } else if (Model.shouldDismissWindow(
+        root.opened,
+        root.pendingFocusAddress,
+        root.windowAddress
+      )) {
+        root.hide()
+      }
+      root.pendingFocusAddress = ""
+    }
+  }
+
+  Timer {
     id: stateRefresh
     interval: 250
     onTriggered: root.requestState("sync", null)
@@ -363,6 +600,7 @@ Item {
     function playPause(): string { return root.runAction("playPause") ? "ok" : "unavailable" }
     function next(): string { return root.runAction("next") ? "ok" : "unavailable" }
     function previous(): string { return root.runAction("previous") ? "ok" : "unavailable" }
+    function refreshTheme(): string { root.syncTheme(true); return "ok" }
     function ping(): string { return "ok" }
 
     function status(): string {
@@ -377,6 +615,10 @@ Item {
         playing: root.playing,
         title: root.title,
         artist: root.artist,
+        themeReady: root.themeReady,
+        themeMode: root.themeMode,
+        themeRevision: root.themeRevision,
+        themeError: root.themeError,
         lastError: root.lastError,
         sourceDir: root.sourceDir
       })

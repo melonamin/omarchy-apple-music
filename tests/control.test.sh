@@ -40,3 +40,37 @@ grep -F 'hl.dsp.cursor.move({ x = 2100, y = 13 })' "$MOCK_LOG" >/dev/null
 : >"$MOCK_LOG"
 PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" hide 0xabc
 grep -F 'hl.dsp.window.move({ window = "address:0xabc", workspace = "special:melonamin-apple-music", follow = false })' "$MOCK_LOG" >/dev/null
+
+: >"$MOCK_LOG"
+PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" focus 0xabc
+grep -F 'hl.dsp.focus({ window = "address:0xabc" })' "$MOCK_LOG" >/dev/null
+grep -F 'hl.dsp.cursor.move({ x = 2100, y = 13 })' "$MOCK_LOG" >/dev/null
+
+revision=$(XDG_DATA_HOME="$TEST_DIR/data" "$ROOT/control.sh" theme \
+  '#222222' '#c2c2b0' '#78824b' '#78824b' '#666666' '#685742' dark)
+[[ $revision =~ ^[0-9]+$ ]]
+
+RUNTIME_EXTENSION="$TEST_DIR/data/omarchy-apple-music/extension"
+for name in manifest.json theme-model.js content.js content.css theme.json; do
+  [[ -f $RUNTIME_EXTENSION/$name ]]
+done
+jq -e --arg revision "$revision" '
+  .schemaVersion == 1
+  and .revision == $revision
+  and .mode == "dark"
+  and .colors.background == "#222222"
+  and .colors.foreground == "#c2c2b0"
+  and .colors.border == "#78824b"
+  and .colors.accent == "#78824b"
+  and .colors.muted == "#666666"
+  and .colors.urgent == "#685742"
+' "$RUNTIME_EXTENSION/theme.json" >/dev/null
+
+grep -F 'load_extension_paths' "$ROOT/control.sh" >/dev/null
+grep -F 'chromium-flags.conf' "$ROOT/control.sh" >/dev/null
+
+if XDG_DATA_HOME="$TEST_DIR/data" "$ROOT/control.sh" theme \
+  red '#c2c2b0' '#78824b' '#78824b' '#666666' '#685742' dark 2>/dev/null; then
+  echo "invalid colors must be rejected" >&2
+  exit 1
+fi

@@ -1,0 +1,112 @@
+:root[data-omarchy-theme] {
+  --pageBG: var(--omarchy-background) !important;
+  --pageBG-dark: var(--omarchy-background) !important;
+  --pageBG-light: var(--omarchy-background) !important;
+  --pageBG-rgb: var(--omarchy-background-rgb) !important;
+  --pageBG-dark-rgb: var(--omarchy-background-rgb) !important;
+  --pageBG-light-rgb: var(--omarchy-background-rgb) !important;
+
+  --systemPrimary: var(--omarchy-foreground) !important;
+  --systemPrimary-onDark: var(--omarchy-foreground) !important;
+  --systemPrimary-onLight: var(--omarchy-foreground) !important;
+  --systemPrimary-vibrant: var(--omarchy-foreground) !important;
+  --systemPrimary-vibrantOnDark: var(--omarchy-foreground) !important;
+  --systemPrimary-vibrantOnLight: var(--omarchy-foreground) !important;
+  --systemSecondary: var(--omarchy-secondary) !important;
+  --systemSecondary-onDark: var(--omarchy-secondary) !important;
+  --systemSecondary-onLight: var(--omarchy-secondary) !important;
+  --systemSecondary-vibrant: var(--omarchy-secondary) !important;
+  --systemSecondary-vibrantOnDark: var(--omarchy-secondary) !important;
+  --systemSecondary-vibrantOnLight: var(--omarchy-secondary) !important;
+  --systemTertiary: var(--omarchy-tertiary) !important;
+  --systemTertiary-onDark: var(--omarchy-tertiary) !important;
+  --systemTertiary-onLight: var(--omarchy-tertiary) !important;
+  --systemTertiary-vibrant: var(--omarchy-tertiary) !important;
+  --systemTertiary-vibrantOnDark: var(--omarchy-tertiary) !important;
+  --systemTertiary-vibrantOnLight: var(--omarchy-tertiary) !important;
+  --systemQuaternary: var(--omarchy-hover) !important;
+  --systemQuaternary-onDark: var(--omarchy-hover) !important;
+  --systemQuaternary-onLight: var(--omarchy-hover) !important;
+  --systemQuinary: color-mix(in srgb, var(--omarchy-foreground) 5%, transparent) !important;
+  --systemQuinary-onDark: color-mix(in srgb, var(--omarchy-foreground) 5%, transparent) !important;
+  --systemQuinary-onLight: color-mix(in srgb, var(--omarchy-foreground) 5%, transparent) !important;
+
+  --keyColor: var(--omarchy-accent) !important;
+  --keyColor-default_IC: var(--omarchy-accent) !important;
+  --keyColor-rgb: var(--omarchy-accent-rgb) !important;
+  --keyColor-rollover: var(--omarchy-accent) !important;
+  --keyColor-pressed: var(--omarchy-accent) !important;
+  --musicKeyColor: var(--omarchy-accent) !important;
+  --musicKeyColor-default_IC: var(--omarchy-accent) !important;
+  --musicKeyColor-rollover: var(--omarchy-accent) !important;
+  --musicKeyColor-pressed: var(--omarchy-accent) !important;
+  --systemRed: var(--omarchy-urgent) !important;
+
+  --labelDivider: var(--omarchy-divider) !important;
+  --labelDivider-onDark: var(--omarchy-divider) !important;
+  --labelDivider-onLight: var(--omarchy-divider) !important;
+  --keyline-border-style: 1px solid var(--omarchy-divider) !important;
+  --contextMenuBorderColor: var(--omarchy-divider) !important;
+  --contextMenuTextColor: var(--omarchy-foreground) !important;
+
+  --navSidebarBG: var(--omarchy-elevated) !important;
+  --navSidebarSelectedState: var(--omarchy-selected) !important;
+  --playerBackground: color-mix(in srgb, var(--omarchy-elevated) 94%, transparent) !important;
+  --playerBackgroundFallback: var(--omarchy-elevated) !important;
+  --miniPlayerBackground: var(--omarchy-elevated) !important;
+  --fallbackMaterialBG: color-mix(in srgb, var(--omarchy-elevated) 97%, transparent) !important;
+  --dropdownBackground: var(--omarchy-elevated) !important;
+  --footerBg: var(--omarchy-elevated) !important;
+  --shelfBG: var(--omarchy-hover) !important;
+  --trackBackgroundEven: var(--omarchy-hover) !important;
+  --lockupHoverBGColor: var(--omarchy-hover) !important;
+  --button-circle-background-color: var(--omarchy-hover) !important;
+  --button-circle-border-color: var(--omarchy-divider) !important;
+  --add-to-library-bg-color: var(--omarchy-hover) !important;
+  --add-to-library-border-color: var(--omarchy-divider) !important;
+  --modalCloseButtonBGColor: var(--omarchy-elevated) !important;
+  --modalCloseButtonBGColor-rollover: var(--omarchy-hover) !important;
+  --modalCloseButtonBGColor-pressed: var(--omarchy-pressed) !important;
+}
+
+:root[data-omarchy-theme] body {
+  background: var(--omarchy-background) !important;
+  color: var(--omarchy-foreground) !important;
+}
+
+:root[data-omarchy-theme] .navigation {
+  background-color: var(--omarchy-elevated) !important;
+  border-color: var(--omarchy-divider) !important;
+}
+
+:root[data-omarchy-theme] .navigation-item--selected,
+:root[data-omarchy-theme] [aria-current="page"] {
+  background-color: var(--omarchy-selected) !important;
+}
+
+:root[data-omarchy-theme] .navigation-item:not(.navigation-item--selected):hover,
+:root[data-omarchy-theme] .songs-list-row:hover,
+:root[data-omarchy-theme] .track-lockup:hover {
+  background-color: var(--omarchy-hover) !important;
+}
+
+:root[data-omarchy-theme] .player-bar,
+:root[data-omarchy-theme] .chrome-player {
+  border-color: var(--omarchy-divider) !important;
+}
+
+:root[data-omarchy-theme] a:focus-visible,
+:root[data-omarchy-theme] button:focus-visible,
+:root[data-omarchy-theme] [role="button"]:focus-visible {
+  outline: 2px solid var(--omarchy-accent) !important;
+  outline-offset: 2px;
+}
+
+:root[data-omarchy-theme] ::selection {
+  background: var(--omarchy-selection-border);
+  color: var(--omarchy-foreground);
+}
+
+:root[data-omarchy-theme] ::-webkit-scrollbar-thumb {
+  background-color: var(--omarchy-divider);
+}

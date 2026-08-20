@@ -1,10 +1,71 @@
 #!/bin/bash
 set -euo pipefail
 
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WINDOW_CLASS="melonamin.apple-music"
 SPECIAL_NAME="melonamin-apple-music"
 SPECIAL_WORKSPACE="special:$SPECIAL_NAME"
 APPLE_MUSIC_URL="https://music.apple.com"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-apple-music"
+PROFILE_DIR="$DATA_DIR/chromium"
+EXTENSION_DIR="$DATA_DIR/extension"
+
+write_theme_file() {
+  local background=$1 foreground=$2 border=$3 accent=$4 muted=$5 urgent=$6 mode=$7
+  local revision tmp
+  revision=$(date +%s%N)
+  tmp=$(mktemp "$EXTENSION_DIR/.theme.XXXXXX")
+
+  if ! jq -n \
+    --arg revision "$revision" \
+    --arg mode "$mode" \
+    --arg background "$background" \
+    --arg foreground "$foreground" \
+    --arg border "$border" \
+    --arg accent "$accent" \
+    --arg muted "$muted" \
+    --arg urgent "$urgent" \
+    '{schemaVersion: 1, revision: $revision, mode: $mode, colors: {
+      background: $background,
+      foreground: $foreground,
+      border: $border,
+      accent: $accent,
+      muted: $muted,
+      urgent: $urgent
+    }}' >"$tmp"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+
+  chmod 0600 "$tmp"
+  mv -f -- "$tmp" "$EXTENSION_DIR/theme.json"
+  printf '%s\n' "$revision"
+}
+
+prepare_extension() {
+  local name
+  umask 077
+  mkdir -p "$EXTENSION_DIR"
+  for name in manifest.json theme-model.js content.js content.css; do
+    install -m 0644 "$ROOT/extension/$name" "$EXTENSION_DIR/$name"
+  done
+
+  if [[ ! -f $EXTENSION_DIR/theme.json ]]; then
+    write_theme_file "#1f1f1f" "#f5f5f7" "#555555" "#fa586a" "#98989d" "#ff453a" "dark" >/dev/null
+  fi
+}
+
+publish_theme() {
+  (( $# == 7 )) || { echo "usage: $0 theme <background> <foreground> <border> <accent> <muted> <urgent> <dark|light>" >&2; return 2; }
+  local color
+  for color in "${@:1:6}"; do
+    [[ $color =~ ^#[0-9a-fA-F]{6}$ ]] || { echo "invalid theme color: $color" >&2; return 2; }
+  done
+  [[ $7 == "dark" || $7 == "light" ]] || { echo "invalid theme mode: $7" >&2; return 2; }
+
+  prepare_extension
+  write_theme_file "$1" "$2" "$3" "$4" "$5" "$6" "$7"
+}
 
 hypr_json() {
   local command=$1 output signature
@@ -57,34 +118,42 @@ state() {
 }
 
 browser_executable() {
-  local browser executable
-  browser=$(env -u BROWSER xdg-settings get default-web-browser 2>/dev/null || true)
-  case $browser in
-  google-chrome* | brave* | microsoft-edge* | opera* | vivaldi* | helium* | chromium*) ;;
-  *) browser="chromium.desktop" ;;
-  esac
+  command -v chromium
+}
 
-  executable=$(sed -n 's/^Exec=\([^ ]*\).*/\1/p' \
-    "$HOME/.local/share/applications/$browser" \
-    "$HOME/.nix-profile/share/applications/$browser" \
-    "/usr/share/applications/$browser" 2>/dev/null | head -1)
-  [[ -n $executable ]] || executable="chromium"
-  command -v "$executable"
+load_extension_paths() {
+  local file line value paths=""
+  for file in "/etc/chromium/chromium-flags.conf" "${XDG_CONFIG_HOME:-$HOME/.config}/chromium-flags.conf"; do
+    [[ -f $file ]] || continue
+    while IFS= read -r line; do
+      if [[ $line =~ ^[[:space:]]*--load-extension=(.+)$ ]]; then
+        value=${BASH_REMATCH[1]}
+        value=${value#\"}
+        value=${value%\"}
+        value=${value#\'}
+        value=${value%\'}
+        paths+="${paths:+,}$value"
+      fi
+    done <"$file"
+  done
+  printf '%s%s%s\n' "$paths" "${paths:+,}" "$EXTENSION_DIR"
 }
 
 launch() {
-  local executable profile_dir unit
+  local executable extension_paths unit
   executable=$(browser_executable)
-  profile_dir="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-apple-music/chromium"
+  extension_paths=$(load_extension_paths)
   unit="omarchy-apple-music-$(date +%s%N)"
 
+  prepare_extension
   umask 077
-  mkdir -p "$profile_dir"
+  mkdir -p "$PROFILE_DIR"
 
   systemd-run --user --quiet --collect --unit="$unit" \
     --property=StandardOutput=null --property=StandardError=null \
     uwsm-app -- "$executable" \
-      --user-data-dir="$profile_dir" \
+      --user-data-dir="$PROFILE_DIR" \
+      --load-extension="$extension_paths" \
       --class="$WINDOW_CLASS" \
       --app="$APPLE_MUSIC_URL" \
       --no-first-run
@@ -139,6 +208,40 @@ hide_window() {
   hypr_call dispatch "hl.dsp.window.move({ window = \"address:$address\", workspace = \"$SPECIAL_WORKSPACE\", follow = false })"
 }
 
+focus_window() {
+  local address=$1 cursor_json cursor_x cursor_y
+  [[ $address =~ ^0x[0-9a-fA-F]+$ ]] || return 2
+
+  cursor_json=$(hypr_json cursorpos 2>/dev/null || true)
+  cursor_x=$(jq -r '(.x // empty) | floor' <<<"$cursor_json" 2>/dev/null || true)
+  cursor_y=$(jq -r '(.y // empty) | floor' <<<"$cursor_json" 2>/dev/null || true)
+  if [[ ! $cursor_x =~ ^-?[0-9]+$ || ! $cursor_y =~ ^-?[0-9]+$ ]]; then
+    cursor_x=""
+    cursor_y=""
+  fi
+
+  hypr_call dispatch "hl.dsp.focus({ window = \"address:$address\" })"
+  if [[ -n $cursor_x ]]; then
+    hypr_call dispatch "hl.dsp.cursor.move({ x = $cursor_x, y = $cursor_y })"
+  fi
+}
+
+wait_for_theme() {
+  local attempt observed=0
+  for (( attempt = 0; attempt < 300; attempt++ )); do
+    if pgrep -u "$UID" -f '[o]marchy-theme-set([[:space:]]|$)' >/dev/null; then
+      observed=1
+    elif (( observed )); then
+      sleep 1
+      return
+    elif (( attempt >= 15 )); then
+      return
+    fi
+    sleep 0.1
+  done
+  sleep 1
+}
+
 install_rules() {
   local lua_path=$1 force=${2:-false} code
   [[ -f $lua_path ]]
@@ -154,12 +257,21 @@ show)
   show_window "$2" "$3" "$4" "$5" "$6" "$7"
   ;;
 hide) hide_window "${2:-}" ;;
+focus)
+  (( $# == 2 )) || { echo "usage: $0 focus <address>" >&2; exit 2; }
+  focus_window "$2"
+  ;;
+wait-theme) wait_for_theme ;;
+theme)
+  shift
+  publish_theme "$@"
+  ;;
 rules)
   (( $# >= 2 )) || { echo "usage: $0 rules <lua-path> [true|false]" >&2; exit 2; }
   install_rules "$2" "${3:-false}"
   ;;
 *)
-  echo "usage: $0 <state|launch|show|hide|rules>" >&2
+  echo "usage: $0 <state|launch|show|hide|focus|wait-theme|theme|rules>" >&2
   exit 2
   ;;
 esac
