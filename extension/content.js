@@ -3,7 +3,9 @@
 
   const model = globalThis.OmarchyAppleMusicTheme
   const themeUrl = chrome.runtime.getURL("theme.json")
-  const pollInterval = 100
+  const activePollInterval = 100
+  const idlePollInterval = 1000
+  const activePollDuration = 3000
   const suppressedLinks = new WeakMap()
   const commandAttribute = "data-omarchy-apple-music-command"
   const stateAttribute = "data-omarchy-apple-music-state"
@@ -25,6 +27,9 @@
   let panelView = "queue"
   let queueSignature = ""
   let seeking = false
+  let activePollUntil = 0
+  let pollTimer = 0
+  let activatingAnchor = null
 
   function webLink(anchor) {
     const href = anchor && anchor.getAttribute ? anchor.getAttribute("href") : ""
@@ -66,8 +71,12 @@
     const anchor = suppressedAnchor(event.target)
     if (!anchor) return
     const saved = suppressedLinks.get(anchor)
+    activatingAnchor = anchor
     anchor.setAttribute("href", saved.href)
-    setTimeout(function() { suppressLink(anchor) }, 0)
+    setTimeout(function() {
+      activatingAnchor = null
+      suppressLink(anchor)
+    }, 0)
   }
 
   function activateFromKeyboard(event) {
@@ -94,17 +103,24 @@
   async function refreshTheme() {
     try {
       const response = await fetch(`${themeUrl}?revision=${Date.now()}`, { cache: "no-store" })
-      if (!response.ok) return
-      applyTheme(await response.json())
+      if (!response.ok) return false
+      return applyTheme(await response.json())
     } catch (_) {
       // Keep the last valid palette, or Apple's original styling on first load.
     }
+    return false
   }
 
   function refreshAfterWake() {
-    refreshTheme()
+    burstPolling()
+    if (!pollTimer) return
+    clearTimeout(pollTimer)
+    pollTimer = 0
+    pollTheme()
   }
 
+  // Mirrors of the helpers in player-model.js: the isolated and main worlds cannot
+  // share code, so both copies must stay in step.
   function normalizeView(value) {
     return value === "full" ? "full" : "queue"
   }
@@ -372,10 +388,21 @@
     })
   }
 
+  // A theme change only lands right after a wake or another change, so the fast
+  // interval is spent there and the idle window costs one fetch per second.
+  function burstPolling() {
+    activePollUntil = Date.now() + activePollDuration
+  }
+
+  function schedulePoll(delay) {
+    if (pollTimer) return
+    pollTimer = setTimeout(pollTheme, delay)
+  }
+
   async function pollTheme() {
-    await refreshTheme()
-    suppressStatusUrls(document)
-    setTimeout(pollTheme, pollInterval)
+    pollTimer = 0
+    if (await refreshTheme()) burstPolling()
+    schedulePoll(Date.now() < activePollUntil ? activePollInterval : idlePollInterval)
   }
 
   window.addEventListener("focus", refreshAfterWake, { passive: true })
@@ -390,17 +417,28 @@
     if (document.visibilityState === "visible") refreshAfterWake()
   }, { passive: true })
 
+  // Apple's router rewrites href on anchors that are already in the document, so
+  // attribute records matter as much as added nodes.
   const linkObserver = new MutationObserver(function(records) {
     for (const record of records) {
-      for (const node of record.addedNodes) suppressStatusUrls(node)
+      if (record.type !== "attributes") {
+        for (const node of record.addedNodes) suppressStatusUrls(node)
+        continue
+      }
+      const anchor = record.target
+      // The restored href has to survive until the browser runs the anchor's activation.
+      if (anchor === activatingAnchor) continue
+      // Suppression itself removes the href, and that record must not start a loop.
+      if (!anchor.matches || !anchor.matches("a[href]")) continue
+      suppressLink(anchor)
     }
   })
-  linkObserver.observe(document, { childList: true, subtree: true })
+  linkObserver.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] })
 
   refreshAfterWake()
   loadView()
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ensurePlayerUi, { once: true })
   else ensurePlayerUi()
   suppressStatusUrls(document)
-  setTimeout(pollTheme, pollInterval)
+  pollTheme()
 })()

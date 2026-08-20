@@ -8,6 +8,7 @@ const bridgeSource = fs.readFileSync(require.resolve("../extension/player-bridge
 function bridgeHarness(instance) {
   const attributes = new Map()
   const listeners = new Map()
+  let current = instance
   const document = {
     documentElement: {
       getAttribute(name) { return attributes.get(name) || null },
@@ -19,7 +20,7 @@ function bridgeHarness(instance) {
   const context = {
     document,
     Event: class Event { constructor(type) { this.type = type } },
-    MusicKit: { getInstance() { return instance } },
+    MusicKit: { getInstance() { return current } },
     OmarchyAppleMusicPlayer: { serializePlayer() { return {} } },
     setInterval() { return 1 },
     clearInterval() {},
@@ -28,9 +29,15 @@ function bridgeHarness(instance) {
   }
   vm.runInNewContext(bridgeSource, context)
 
-  return function send(command) {
-    attributes.set("data-omarchy-apple-music-command", JSON.stringify(command))
-    listeners.get("omarchy-apple-music-command")()
+  return {
+    send(command) {
+      attributes.set("data-omarchy-apple-music-command", JSON.stringify(command))
+      listeners.get("omarchy-apple-music-command")()
+    },
+    discover(next) {
+      current = next
+      listeners.get("musickitloaded")()
+    }
   }
 }
 
@@ -47,7 +54,7 @@ test("queue item clicks select the existing MusicKit queue index", () => {
     }
   }
 
-  bridgeHarness(instance)({ name: "playAt", value: 4 })
+  bridgeHarness(instance).send({ name: "playAt", value: 4 })
   assert.equal(selected, 4)
 })
 
@@ -60,8 +67,26 @@ test("queue item clicks ignore non-integer positions", () => {
     }
   }
 
-  const send = bridgeHarness(instance)
-  send({ name: "playAt", value: "invalid" })
-  send({ name: "playAt", value: 1.5 })
+  const harness = bridgeHarness(instance)
+  harness.send({ name: "playAt", value: "invalid" })
+  harness.send({ name: "playAt", value: 1.5 })
   assert.equal(selections, 0)
+})
+
+test("binding a replacement MusicKit instance releases the previous listeners", () => {
+  const bound = []
+  const released = []
+  const first = {
+    addEventListener(name) { bound.push(name) },
+    removeEventListener(name) { released.push(name) }
+  }
+  const second = {
+    addEventListener() {},
+    removeEventListener() {}
+  }
+
+  const harness = bridgeHarness(first)
+  assert.ok(bound.length > 0)
+  harness.discover(second)
+  assert.deepEqual(released, bound)
 })

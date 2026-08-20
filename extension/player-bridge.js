@@ -81,10 +81,17 @@
     }
   }
 
+  function onPlayerEvent() {
+    publish(false)
+  }
+
   function bind(candidate) {
     if (!candidate || candidate === instance) return
+    if (instance && typeof instance.removeEventListener === "function") {
+      for (const name of watchedEvents) instance.removeEventListener(name, onPlayerEvent)
+    }
     instance = candidate
-    for (const name of watchedEvents) instance.addEventListener(name, function() { publish(false) })
+    for (const name of watchedEvents) instance.addEventListener(name, onPlayerEvent)
     publish(true)
   }
 
