@@ -61,9 +61,8 @@ configure_profile() {
   umask 077
   mkdir -p "$PROFILE_DIR/Default"
 
-  if [[ -f $preferences ]]; then
-    current=$(jq -r '.partition.default_zoom_level.x // empty' "$preferences")
-    [[ $current == $DEFAULT_ZOOM_LEVEL ]] && return
+  if [[ -f $preferences ]] && current=$(jq -r '.partition.default_zoom_level.x // empty' "$preferences" 2>/dev/null); then
+    [[ $current == "$DEFAULT_ZOOM_LEVEL" ]] && return
     tmp=$(mktemp "$PROFILE_DIR/Default/.Preferences.XXXXXX")
     if ! jq --argjson level "$DEFAULT_ZOOM_LEVEL" '.partition.default_zoom_level.x = $level' "$preferences" >"$tmp"; then
       rm -f -- "$tmp"

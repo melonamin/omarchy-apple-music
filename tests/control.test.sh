@@ -87,6 +87,12 @@ XDG_DATA_HOME="$TEST_DIR/launch-data" PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" 
 PROFILE_PREFERENCES="$TEST_DIR/launch-data/omarchy-apple-music/chromium/Default/Preferences"
 jq -e '.partition.default_zoom_level.x == -0.5778829311823857' "$PROFILE_PREFERENCES" >/dev/null
 
+CORRUPT_PREFERENCES="$TEST_DIR/corrupt-data/omarchy-apple-music/chromium/Default/Preferences"
+mkdir -p "$(dirname "$CORRUPT_PREFERENCES")"
+printf 'not json\n' >"$CORRUPT_PREFERENCES"
+XDG_DATA_HOME="$TEST_DIR/corrupt-data" PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" launch
+jq -e '.partition.default_zoom_level.x == -0.5778829311823857' "$CORRUPT_PREFERENCES" >/dev/null
+
 if XDG_DATA_HOME="$TEST_DIR/data" "$ROOT/control.sh" theme \
   red '#c2c2b0' '#78824b' '#78824b' '#666666' '#685742' dark 2>/dev/null; then
   echo "invalid colors must be rejected" >&2
