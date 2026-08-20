@@ -9,6 +9,7 @@ APPLE_MUSIC_URL="https://music.apple.com"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-apple-music"
 PROFILE_DIR="$DATA_DIR/chromium"
 EXTENSION_DIR="$DATA_DIR/extension"
+EXTENSION_FILES=(manifest.json theme-model.js player-model.js player-bridge.js content.js content.css)
 DEFAULT_ZOOM_LEVEL="-0.5778829311823857"
 
 write_theme_file() {
@@ -44,11 +45,23 @@ write_theme_file() {
 }
 
 prepare_extension() {
-  local name
+  local name entry known keep
   umask 077
   mkdir -p "$EXTENSION_DIR"
-  for name in manifest.json theme-model.js player-model.js player-bridge.js content.js content.css; do
+  for name in "${EXTENSION_FILES[@]}"; do
     install -m 0644 "$ROOT/extension/$name" "$EXTENSION_DIR/$name"
+  done
+
+  # Files dropped by newer plugin versions must not linger in deployed profiles.
+  for entry in "$EXTENSION_DIR"/*; do
+    [[ -e $entry ]] || continue
+    name=${entry##*/}
+    [[ $name == theme.json ]] && continue
+    keep=false
+    for known in "${EXTENSION_FILES[@]}"; do
+      [[ $name == "$known" ]] && { keep=true; break; }
+    done
+    [[ $keep == true ]] || rm -rf -- "$entry"
   done
 
   if [[ ! -f $EXTENSION_DIR/theme.json ]]; then

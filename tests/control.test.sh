@@ -66,6 +66,12 @@ jq -e --arg revision "$revision" '
   and .colors.urgent == "#685742"
 ' "$RUNTIME_EXTENSION/theme.json" >/dev/null
 
+touch "$RUNTIME_EXTENSION/background.js"
+XDG_DATA_HOME="$TEST_DIR/data" "$ROOT/control.sh" theme \
+  '#222222' '#c2c2b0' '#78824b' '#78824b' '#666666' '#685742' dark >/dev/null
+[[ ! -e $RUNTIME_EXTENSION/background.js ]]
+[[ -f $RUNTIME_EXTENSION/theme.json ]]
+
 grep -F 'load_extension_paths' "$ROOT/control.sh" >/dev/null
 grep -F 'chromium-flags.conf' "$ROOT/control.sh" >/dev/null
 
