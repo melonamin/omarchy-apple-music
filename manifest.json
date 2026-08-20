@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "melonamin.apple-music",
+  "name": "Apple Music",
+  "version": "0.1.0",
+  "author": "melonamin",
+  "description": "Apple Music as a persistent, bar-anchored Chromium app window.",
+  "homepage": "https://github.com/melonamin/omarchy-apple-music",
+  "license": "MIT",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Apple Music",
+    "description": "Apple Music dropdown and now-playing status",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
