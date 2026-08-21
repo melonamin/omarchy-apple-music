@@ -16,7 +16,7 @@ bash -n "$ROOT/spectrum.sh"
 pass "control script parses"
 
 plugin_version=$(jq -r '.version // empty' "$ROOT/manifest.json")
-extension_version=$(jq -r '.version // empty' "$ROOT/extension/manifest.json")
+extension_version=$(jq -r '.version // empty' "$ROOT/extension/chromium-manifest.json")
 [[ -n $plugin_version ]] || fail "plugin manifest has no version"
 [[ $plugin_version == "$extension_version" ]] ||
   fail "manifest versions differ: plugin $plugin_version, extension $extension_version"
@@ -35,7 +35,7 @@ jq -e '
   and .web_accessible_resources[0].resources == ["theme.json", "spectrum.json"]
   and .web_accessible_resources[0].matches == ["https://music.apple.com/*"]
   and (.host_permissions == null)
-' "$ROOT/extension/manifest.json" >/dev/null
+' "$ROOT/extension/chromium-manifest.json" >/dev/null
 pass "browser extension is scoped to Apple Music with local-only view persistence"
 
 omarchy plugin validate "$ROOT" >/dev/null

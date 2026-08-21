@@ -11,6 +11,7 @@ PROFILE_DIR="$DATA_DIR/chromium"
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-$DATA_DIR/runtime}/omarchy-apple-music"
 EXTENSION_DIR="$RUNTIME_DIR/extension"
 EXTENSION_FILES=(manifest.json theme-model.js player-model.js player-bridge.js content.js content.css)
+EXTENSION_MANIFEST_SOURCE="chromium-manifest.json"
 DEFAULT_ZOOM_LEVEL="-0.5778829311823857"
 
 write_theme_file() {
@@ -50,7 +51,11 @@ prepare_extension() {
   umask 077
   mkdir -p "$EXTENSION_DIR"
   for name in "${EXTENSION_FILES[@]}"; do
-    install -m 0644 "$ROOT/extension/$name" "$EXTENSION_DIR/$name"
+    if [[ $name == "manifest.json" ]]; then
+      install -m 0644 "$ROOT/extension/$EXTENSION_MANIFEST_SOURCE" "$EXTENSION_DIR/$name"
+    else
+      install -m 0644 "$ROOT/extension/$name" "$EXTENSION_DIR/$name"
+    fi
   done
 
   # Files dropped by newer plugin versions must not linger in deployed profiles.
