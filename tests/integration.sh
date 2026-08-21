@@ -12,6 +12,7 @@ command -v node >/dev/null || fail "node not found"
 command -v omarchy >/dev/null || fail "omarchy not found"
 
 bash -n "$ROOT/control.sh"
+bash -n "$ROOT/spectrum.sh"
 pass "control script parses"
 
 plugin_version=$(jq -r '.version // empty' "$ROOT/manifest.json")
@@ -31,6 +32,8 @@ jq -e '
   and .content_scripts[0].js == ["player-model.js", "player-bridge.js"]
   and .content_scripts[1].matches == ["https://music.apple.com/*"]
   and .content_scripts[1].run_at == "document_start"
+  and .web_accessible_resources[0].resources == ["theme.json", "spectrum.json"]
+  and .web_accessible_resources[0].matches == ["https://music.apple.com/*"]
   and (.host_permissions == null)
 ' "$ROOT/extension/manifest.json" >/dev/null
 pass "browser extension is scoped to Apple Music with local-only view persistence"
@@ -49,6 +52,9 @@ pass "player model tests pass"
 
 node --test "$ROOT/tests/player-bridge.test.js"
 pass "player bridge tests pass"
+
+"$ROOT/tests/spectrum.test.sh"
+pass "system spectrum analyser tests pass"
 
 "$ROOT/tests/control.test.sh"
 pass "window lifecycle commands pass"

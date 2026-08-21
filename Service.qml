@@ -63,6 +63,8 @@ Item {
   readonly property string album: activePlayer ? String(activePlayer.trackAlbum || "") : ""
   readonly property string artUrl: activePlayer ? String(activePlayer.trackArtUrl || "") : ""
   readonly property bool playing: activePlayer ? activePlayer.isPlaying === true : false
+  readonly property bool spectrumWanted: opened && playing && browserPid > 0
+  property int spectrumPid: 0
 
   property string stateIntent: ""
   property var stateAnchor: null
@@ -316,6 +318,24 @@ Item {
     rulesProc.running = true
   }
 
+  function syncSpectrum() {
+    spectrumRestart.stop()
+    if (!spectrumWanted) {
+      if (spectrumProc.running) spectrumProc.running = false
+      else spectrumPid = 0
+      return
+    }
+
+    if (spectrumProc.running) {
+      if (spectrumPid !== browserPid) spectrumProc.running = false
+      return
+    }
+
+    spectrumPid = browserPid
+    spectrumProc.command = [controlPath, "spectrum", String(browserPid)]
+    spectrumProc.running = true
+  }
+
   function handleHyprlandEvent(event) {
     var name = String(event && event.name ? event.name : "")
     if (name === "openlayer") {
@@ -403,6 +423,8 @@ Item {
   }
 
   onControlPathChanged: initialize()
+  onSpectrumWantedChanged: spectrumSync.restart()
+  onBrowserPidChanged: spectrumSync.restart()
 
   Component.onCompleted: Qt.callLater(function() {
     root.initialize()
@@ -431,6 +453,26 @@ Item {
         Qt.callLater(function() { root.syncTheme(false) })
       }
     }
+  }
+
+  Process {
+    id: spectrumProc
+    onExited: function(code) {
+      root.spectrumPid = 0
+      if (root.spectrumWanted) spectrumRestart.restart()
+    }
+  }
+
+  Timer {
+    id: spectrumSync
+    interval: 0
+    onTriggered: root.syncSpectrum()
+  }
+
+  Timer {
+    id: spectrumRestart
+    interval: 500
+    onTriggered: root.syncSpectrum()
   }
 
   Timer {
@@ -618,6 +660,8 @@ Item {
         rulesInstalled: root.rulesInstalled,
         hasMedia: root.hasMedia,
         playing: root.playing,
+        spectrumWanted: root.spectrumWanted,
+        spectrumRunning: spectrumProc.running,
         title: root.title,
         artist: root.artist,
         themeReady: root.themeReady,

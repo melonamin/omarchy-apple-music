@@ -4,7 +4,7 @@
   "name": "Apple Music",
   "version": "0.2.0",
   "author": "melonamin",
-  "description": "Apple Music as a persistent, bar-anchored Chromium app window.",
+  "description": "A theme-aware Apple Music dropdown with compact queue controls, a live Omarchy spectrum, and a persistent mini-player.",
   "homepage": "https://github.com/melonamin/omarchy-apple-music",
   "license": "MIT",
   "kinds": [
@@ -18,7 +18,7 @@
   },
   "barWidget": {
     "displayName": "Apple Music",
-    "description": "Apple Music dropdown and now-playing status",
+    "description": "Open Apple Music, control playback, and see what is playing",
     "category": "Media",
     "allowMultiple": false,
     "defaultSection": "right"

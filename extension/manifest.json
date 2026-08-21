@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Omarchy Apple Music",
   "version": "0.2.0",
-  "description": "Adds an Omarchy-themed compact player and full-view switch to music.apple.com.",
+  "description": "Adds an Omarchy-themed compact player, live system spectrum, and full-view switch to music.apple.com.",
   "permissions": [
     "storage"
   ],
@@ -35,7 +35,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "theme.json"
+        "theme.json",
+        "spectrum.json"
       ],
       "matches": [
         "https://music.apple.com/*"

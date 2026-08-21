@@ -482,6 +482,185 @@
   font-variant-numeric: tabular-nums;
 }
 
+.omarchy-visualizer {
+  position: relative;
+  width: 100%;
+  min-height: 96px;
+  flex: 1 1 96px;
+  display: grid;
+  place-items: center;
+  margin: 14px 0 4px;
+  overflow: hidden;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--omarchy-accent, #fa586a) 20%, transparent) 0 0.7px, transparent 0.9px);
+  background-position: center;
+  background-size: 8px 8px;
+  mask-image: linear-gradient(90deg, transparent, black 14%, black 86%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 14%, black 86%, transparent);
+  pointer-events: none;
+}
+
+.omarchy-visualizer::before,
+.omarchy-visualizer::after {
+  position: absolute;
+  left: 50%;
+  width: min(100%, 300px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--omarchy-divider, rgba(255, 255, 255, 0.12)) 20%, var(--omarchy-divider, rgba(255, 255, 255, 0.12)) 80%, transparent);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.omarchy-visualizer::before {
+  top: 17%;
+}
+
+.omarchy-visualizer::after {
+  bottom: 17%;
+}
+
+.omarchy-visualizer-wordmark {
+  width: min(88%, 310px);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--omarchy-accent, #fa586a) 16%, transparent));
+}
+
+.omarchy-visualizer-wordmark use {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.omarchy-wordmark-base {
+  color: color-mix(in srgb, var(--omarchy-foreground, #f5f5f7) 14%, transparent);
+  transition: color 180ms ease;
+}
+
+.omarchy-spectrum-color-low {
+  stop-color: var(--omarchy-accent, #fa586a);
+}
+
+.omarchy-spectrum-color-mid {
+  stop-color: color-mix(in srgb, var(--omarchy-accent, #fa586a) 58%, var(--omarchy-foreground, #f5f5f7));
+}
+
+.omarchy-spectrum-color-high {
+  stop-color: color-mix(in srgb, var(--omarchy-accent, #fa586a) 24%, var(--omarchy-foreground, #f5f5f7));
+}
+
+.omarchy-spectrum-bars,
+.omarchy-spectrum-peaks {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+#omarchy-apple-music-ui .omarchy-spectrum-bars rect {
+  fill: var(--omarchy-accent, #fa586a);
+  fill: url(#omarchy-spectrum-color);
+  stroke: none;
+  shape-rendering: crispEdges;
+}
+
+#omarchy-apple-music-ui .omarchy-spectrum-peaks rect {
+  fill: color-mix(in srgb, var(--omarchy-foreground, #f5f5f7) 84%, var(--omarchy-accent, #fa586a));
+  stroke: none;
+  shape-rendering: crispEdges;
+}
+
+#omarchy-apple-music-ui[data-spectrum="live"] .omarchy-spectrum-bars {
+  opacity: 1;
+}
+
+#omarchy-apple-music-ui[data-spectrum="live"] .omarchy-spectrum-peaks {
+  opacity: 0.9;
+}
+
+#omarchy-apple-music-ui[data-spectrum="live"] .omarchy-wordmark-base {
+  color: color-mix(in srgb, var(--omarchy-foreground, #f5f5f7) 9%, transparent);
+}
+
+.omarchy-wordmark-scan,
+.omarchy-wordmark-slice {
+  color: var(--omarchy-accent, #fa586a);
+}
+
+.omarchy-wordmark-scan {
+  opacity: 0.52;
+  clip-path: inset(46% 0 46% 0);
+}
+
+.omarchy-wordmark-slice {
+  opacity: 0.34;
+}
+
+.omarchy-wordmark-slice-a {
+  clip-path: inset(16% 0 68% 0);
+  transform: translateX(5px);
+}
+
+.omarchy-wordmark-slice-b {
+  clip-path: inset(68% 0 14% 0);
+  transform: translateX(-4px);
+}
+
+#omarchy-apple-music-ui[data-spectrum="fallback"] .omarchy-wordmark-base {
+  animation: omarchy-wordmark-breathe 2.8s ease-in-out infinite;
+}
+
+#omarchy-apple-music-ui[data-spectrum="live"] .omarchy-wordmark-scan,
+#omarchy-apple-music-ui[data-spectrum="live"] .omarchy-wordmark-slice,
+#omarchy-apple-music-ui[data-spectrum="idle"] .omarchy-wordmark-scan,
+#omarchy-apple-music-ui[data-spectrum="idle"] .omarchy-wordmark-slice {
+  opacity: 0;
+}
+
+#omarchy-apple-music-ui[data-spectrum="fallback"] .omarchy-wordmark-scan {
+  animation: omarchy-wordmark-scan 2.2s steps(8, end) infinite;
+}
+
+#omarchy-apple-music-ui[data-spectrum="fallback"] .omarchy-wordmark-slice-a {
+  animation: omarchy-wordmark-glitch-a 1.7s steps(2, end) infinite;
+}
+
+#omarchy-apple-music-ui[data-spectrum="fallback"] .omarchy-wordmark-slice-b {
+  animation: omarchy-wordmark-glitch-b 2.3s steps(2, end) infinite;
+}
+
+@keyframes omarchy-wordmark-breathe {
+  0%, 100% { opacity: 0.68; }
+  50% { opacity: 1; }
+}
+
+@keyframes omarchy-wordmark-scan {
+  0% { clip-path: inset(0 0 88% 0); opacity: 0; }
+  12% { opacity: 0.68; }
+  88% { opacity: 0.68; }
+  100% { clip-path: inset(88% 0 0 0); opacity: 0; }
+}
+
+@keyframes omarchy-wordmark-glitch-a {
+  0%, 76%, 100% { transform: translateX(0); opacity: 0; }
+  78%, 84% { transform: translateX(7px); opacity: 0.52; }
+  86%, 92% { transform: translateX(-3px); opacity: 0.3; }
+}
+
+@keyframes omarchy-wordmark-glitch-b {
+  0%, 58%, 100% { transform: translateX(0); opacity: 0; }
+  60%, 70% { transform: translateX(-6px); opacity: 0.46; }
+  72%, 78% { transform: translateX(4px); opacity: 0.28; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #omarchy-apple-music-ui .omarchy-visualizer-wordmark use {
+    animation: none;
+  }
+
+  #omarchy-apple-music-ui .omarchy-spectrum-bars,
+  #omarchy-apple-music-ui .omarchy-spectrum-peaks {
+    display: none;
+  }
+}
+
 .omarchy-player-controls {
   width: min(100%, 300px);
   display: grid;

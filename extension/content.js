@@ -3,9 +3,12 @@
 
   const model = globalThis.OmarchyAppleMusicTheme
   const themeUrl = chrome.runtime.getURL("theme.json")
+  const spectrumUrl = chrome.runtime.getURL("spectrum.json")
   const activePollInterval = 100
   const idlePollInterval = 1000
   const activePollDuration = 3000
+  const spectrumBandCount = 32
+  const spectrumPollInterval = 42
   const suppressedLinks = new WeakMap()
   const commandAttribute = "data-omarchy-apple-music-command"
   const stateAttribute = "data-omarchy-apple-music-state"
@@ -29,6 +32,12 @@
   let seeking = false
   let activePollUntil = 0
   let pollTimer = 0
+  let spectrumPollTimer = 0
+  let spectrumFrame = 0
+  let spectrumLiveAt = 0
+  let spectrumTargets = Array(spectrumBandCount).fill(0)
+  let spectrumLevels = Array(spectrumBandCount).fill(0)
+  let spectrumPeaks = Array(spectrumBandCount).fill(0)
   let activatingAnchor = null
 
   function webLink(anchor) {
@@ -155,6 +164,129 @@
     </div>`
   }
 
+  function visualizerMarkup() {
+    const columnWidth = 1215 / spectrumBandCount
+    const wordmark = `
+      <path fill-rule="evenodd" d="m720 120h-15v15h-14.998v14.999l-60.002.001v15.002l90-.002v.002h.002l-.002 89.998h-15v15h-13v15h-17v-89.998h-45v90l-45-.002v-89.998h-14.998v-30h14.998v-15.002h-14.998v-30.001h14.998v-75h15v-14.997h15v-15.002h105.002zm-90-.001h45v-74.997h-45z"/>
+      <path fill-rule="evenodd" d="m105 30.002h15v14.997h15v180.001h-15v15h-15v15.002h-75v-15.002h-15v-15h-15v-180.001h15v-14.997h15v-15.002h75zm-60 194.998h45v-179.998h-45z"/>
+      <path d="m300 15h60v15h15v14.999h15v180.001h-15v15h-15v15h-15l-.004-209.998h-44.994v-.002h-.002v210.002h-45v-210h-44.998v179.997h-.002v30.003h-15v-15.002h-15v-15h-14.998v-180.001h14.998v-14.999h15v-15h60v-15h45z"/>
+      <path fill-rule="evenodd" d="m555 225h-15v15h-15v15h-15v-105.001l-44.998.001v105.002h-45.002v-105.002h-15v-30.001h15v-75h15.002v-14.997h15v-15.002h105zm-89.998-105.001h44.998v-74.997h-44.998z"/>
+      <path d="m885 75h-15v15h-15v15h-15v-59.998h-45v179.998h45v-59.998h15v14.997h15v15.001h15v30h-15v15h-15v15.002l-105-.002v-210.001h14.998v-14.997h15.002v-15.002h105z"/>
+      <path d="m960 119.999h45v-104.999h15v15h15v14.999h15v75.001h15v15h-15v90h-15v15h-15v15h-15v-105h-45v105.002l-45-.002v-105h-30v-15h15v-15.001h15v-75h15v-14.997h15v-15.002h15z"/>
+      <path d="m1125 119.999h45v-104.999h15v15h15v15h15v180h-15v15h-15v15.002l-75-.002v-15h-15v-15h-15v-45.001h15v-14.997-.002h30v60h45v-75h-90v-105.001h15v-14.997h15v-15.002h15z"/>`
+    const bars = Array.from({ length: spectrumBandCount }, function(_, index) {
+      const x = index * columnWidth + 4
+      return `<rect data-spectrum-bar="${index}" x="${x.toFixed(2)}" y="285" width="${(columnWidth - 8).toFixed(2)}" height="0" rx="3"/>`
+    }).join("")
+    const peaks = Array.from({ length: spectrumBandCount }, function(_, index) {
+      const x = index * columnWidth + 4
+      return `<rect data-spectrum-peak="${index}" x="${x.toFixed(2)}" y="285" width="${(columnWidth - 8).toFixed(2)}" height="5" rx="2"/>`
+    }).join("")
+    return `<div class="omarchy-visualizer" aria-hidden="true">
+      <svg class="omarchy-visualizer-wordmark" viewBox="0 0 1215 285">
+        <defs>
+          <linearGradient id="omarchy-spectrum-color" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1215" y2="0">
+            <stop offset="0" class="omarchy-spectrum-color-low"/>
+            <stop offset="0.5" class="omarchy-spectrum-color-mid"/>
+            <stop offset="1" class="omarchy-spectrum-color-high"/>
+          </linearGradient>
+          <g id="omarchy-wordmark-shape">${wordmark}</g>
+          <clipPath id="omarchy-wordmark-clip">${wordmark}</clipPath>
+        </defs>
+        <use href="#omarchy-wordmark-shape" class="omarchy-wordmark-base"/>
+        <g class="omarchy-spectrum-bars" clip-path="url(#omarchy-wordmark-clip)">${bars}</g>
+        <g class="omarchy-spectrum-peaks" clip-path="url(#omarchy-wordmark-clip)">${peaks}</g>
+        <use href="#omarchy-wordmark-shape" class="omarchy-wordmark-scan"/>
+        <use href="#omarchy-wordmark-shape" class="omarchy-wordmark-slice omarchy-wordmark-slice-a"/>
+        <use href="#omarchy-wordmark-shape" class="omarchy-wordmark-slice omarchy-wordmark-slice-b"/>
+      </svg>
+    </div>`
+  }
+
+  function validSpectrum(payload) {
+    if (!payload || payload.schemaVersion !== 1 || payload.active !== true || !Array.isArray(payload.bands)) return null
+    if (payload.bands.length < spectrumBandCount) return null
+    const bands = payload.bands.slice(0, spectrumBandCount).map(function(value) {
+      const number = Number(value)
+      return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0
+    })
+    return bands
+  }
+
+  function syntheticSpectrum(time) {
+    return Array.from({ length: spectrumBandCount }, function(_, index) {
+      const position = index / (spectrumBandCount - 1)
+      const bassEnvelope = 1 - position * 0.48
+      const pulse = (Math.sin(time * 0.009 + index * 1.71) + 1) * 0.5
+      const drift = (Math.sin(time * 0.0031 + index * 0.47) + 1) * 0.5
+      const shimmer = (Math.sin(time * 0.017 + index * 2.83) + 1) * 0.5
+      return Math.min(0.86, 0.08 + bassEnvelope * (pulse * 0.34 + drift * 0.22 + shimmer * 0.1))
+    })
+  }
+
+  function renderSpectrumFrame(time) {
+    spectrumFrame = 0
+    const root = document.getElementById("omarchy-apple-music-ui")
+    if (!root) return
+
+    const live = playerState.playing && performance.now() - spectrumLiveAt < 320
+    const targets = live ? spectrumTargets : playerState.playing ? syntheticSpectrum(time) : Array(spectrumBandCount).fill(0)
+    root.dataset.spectrum = live ? "live" : playerState.playing ? "fallback" : "idle"
+
+    let moving = false
+    for (let index = 0; index < spectrumBandCount; index++) {
+      const target = targets[index]
+      const response = target > spectrumLevels[index] ? 0.58 : 0.16
+      spectrumLevels[index] += (target - spectrumLevels[index]) * response
+      spectrumPeaks[index] = Math.max(spectrumLevels[index], spectrumPeaks[index] - 0.012)
+      if (spectrumLevels[index] > 0.004 || target > 0.004) moving = true
+
+      const bar = root.querySelector(`[data-spectrum-bar="${index}"]`)
+      const peak = root.querySelector(`[data-spectrum-peak="${index}"]`)
+      if (!bar || !peak) continue
+      const height = Math.max(0, Math.min(285, spectrumLevels[index] * 285))
+      const peakY = Math.max(0, Math.min(280, 285 - spectrumPeaks[index] * 285))
+      bar.setAttribute("y", (285 - height).toFixed(2))
+      bar.setAttribute("height", height.toFixed(2))
+      peak.setAttribute("y", peakY.toFixed(2))
+    }
+
+    if (playerState.playing || moving) spectrumFrame = requestAnimationFrame(renderSpectrumFrame)
+  }
+
+  function ensureSpectrumAnimation() {
+    if (!spectrumFrame) spectrumFrame = requestAnimationFrame(renderSpectrumFrame)
+  }
+
+  function scheduleSpectrumPoll(delay) {
+    if (spectrumPollTimer) return
+    spectrumPollTimer = setTimeout(pollSpectrum, delay)
+  }
+
+  async function pollSpectrum() {
+    spectrumPollTimer = 0
+    const shouldPoll = playerState.playing && panelView === "queue" && document.visibilityState === "visible"
+    if (!shouldPoll) {
+      scheduleSpectrumPoll(250)
+      return
+    }
+
+    try {
+      const response = await fetch(`${spectrumUrl}?revision=${Date.now()}`, { cache: "no-store" })
+      if (response.ok) {
+        const bands = validSpectrum(await response.json())
+        if (bands) {
+          spectrumTargets = bands
+          spectrumLiveAt = performance.now()
+          ensureSpectrumAnimation()
+        }
+      }
+    } catch (_) {
+      // The system analyser is optional; the visualizer keeps its animated fallback.
+    }
+    scheduleSpectrumPoll(spectrumPollInterval)
+  }
+
   function playerMarkup() {
     return `
       <header class="omarchy-plugin-rail">
@@ -178,6 +310,7 @@
             <div class="omarchy-progress-track"><span class="omarchy-progress-fill"></span><input class="omarchy-progress" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position"></div>
             <div class="omarchy-progress-times"><span data-time="elapsed">0:00</span><span data-time="remaining">-0:00</span></div>
           </div>
+          ${visualizerMarkup()}
           <div class="omarchy-player-controls">
             <button data-action="shuffle" aria-label="Toggle shuffle" title="Shuffle">${icon("shuffle")}</button>
             <button data-action="previous" aria-label="Previous track" title="Previous">${icon("previous")}</button>
@@ -213,6 +346,8 @@
     })
     progress.addEventListener("pointerup", function() { seeking = false })
     document.body.append(root)
+    scheduleSpectrumPoll(0)
+    ensureSpectrumAnimation()
     applyView(panelView, false)
     receivePlayerState()
     renderPlayer()
@@ -235,6 +370,7 @@
         button.setAttribute("aria-pressed", String(button.dataset.view === panelView))
       }
     }
+    if (panelView === "queue") scheduleSpectrumPoll(0)
     if (persist) chrome.storage.local.set({ panelView })
   }
 
@@ -357,6 +493,7 @@
 
     root.dataset.playing = String(playerState.playing)
     root.dataset.loading = String(playerState.loading)
+    ensureSpectrumAnimation()
     root.querySelector('[data-icon="play"]').hidden = playerState.playing
     root.querySelector('[data-icon="pause"]').hidden = !playerState.playing
     const playButton = root.querySelector(".omarchy-play-button")
@@ -414,7 +551,11 @@
   document.addEventListener("keydown", activateFromKeyboard, true)
   document.addEventListener(stateEvent, receivePlayerState)
   document.addEventListener("visibilitychange", function() {
-    if (document.visibilityState === "visible") refreshAfterWake()
+    if (document.visibilityState === "visible") {
+      refreshAfterWake()
+      scheduleSpectrumPoll(0)
+      ensureSpectrumAnimation()
+    }
   }, { passive: true })
 
   // Apple's router rewrites href on anchors that are already in the document, so

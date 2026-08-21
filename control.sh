@@ -8,7 +8,8 @@ SPECIAL_WORKSPACE="special:$SPECIAL_NAME"
 APPLE_MUSIC_URL="https://music.apple.com"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-apple-music"
 PROFILE_DIR="$DATA_DIR/chromium"
-EXTENSION_DIR="$DATA_DIR/extension"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-$DATA_DIR/runtime}/omarchy-apple-music"
+EXTENSION_DIR="$RUNTIME_DIR/extension"
 EXTENSION_FILES=(manifest.json theme-model.js player-model.js player-bridge.js content.js content.css)
 DEFAULT_ZOOM_LEVEL="-0.5778829311823857"
 
@@ -56,7 +57,7 @@ prepare_extension() {
   for entry in "$EXTENSION_DIR"/*; do
     [[ -e $entry ]] || continue
     name=${entry##*/}
-    [[ $name == theme.json ]] && continue
+    [[ $name == theme.json || $name == spectrum.json ]] && continue
     keep=false
     for known in "${EXTENSION_FILES[@]}"; do
       [[ $name == "$known" ]] && { keep=true; break; }
@@ -66,6 +67,10 @@ prepare_extension() {
 
   if [[ ! -f $EXTENSION_DIR/theme.json ]]; then
     write_theme_file "#1f1f1f" "#f5f5f7" "#555555" "#fa586a" "#98989d" "#ff453a" "dark" >/dev/null
+  fi
+  if [[ ! -f $EXTENSION_DIR/spectrum.json ]]; then
+    printf '{"schemaVersion":1,"active":false,"revision":0,"bands":[]}\n' >"$EXTENSION_DIR/spectrum.json"
+    chmod 0600 "$EXTENSION_DIR/spectrum.json"
   fi
 }
 
@@ -286,6 +291,13 @@ install_rules() {
   hypr_call eval "$code"
 }
 
+run_spectrum() {
+  local browser_pid=$1
+  [[ $browser_pid =~ ^[0-9]+$ ]] || return 2
+  prepare_extension
+  exec "$ROOT/spectrum.sh" "$browser_pid" "$EXTENSION_DIR/spectrum.json"
+}
+
 case ${1:-} in
 state) state ;;
 launch) launch ;;
@@ -307,8 +319,12 @@ rules)
   (( $# >= 2 )) || { echo "usage: $0 rules <lua-path> [true|false]" >&2; exit 2; }
   install_rules "$2" "${3:-false}"
   ;;
+spectrum)
+  (( $# == 2 )) || { echo "usage: $0 spectrum <browser-pid>" >&2; exit 2; }
+  run_spectrum "$2"
+  ;;
 *)
-  echo "usage: $0 <state|launch|show|hide|focus|wait-theme|theme|rules>" >&2
+  echo "usage: $0 <state|launch|show|hide|focus|wait-theme|theme|rules|spectrum>" >&2
   exit 2
   ;;
 esac

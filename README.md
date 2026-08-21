@@ -1,26 +1,22 @@
 # Apple Music for Omarchy
 
-Apple Music in the Omarchy bar: click once for a full Chromium app window that behaves like a dropdown, then click away without stopping playback.
+Apple Music in the Omarchy bar: a theme-aware Chromium dropdown for browsing, a compact queue for listening, and an optional mini-player that stays within reach.
 
-The plugin launches Apple Music in a dedicated, persistent Chromium profile and parks the window on a named Hyprland special workspace when closed. The bar switches between a compact monochrome state icon and an inline mini-player.
+![Apple Music Queue view themed by Omarchy](preview.png)
 
 ## Features
 
-- Full `music.apple.com` interface in Chromium app mode, including login and browser-provided DRM support
-- Dropdown-like placement against top, bottom, left, and right bars
-- Pointer stays on the bar when the dropdown receives focus
-- Playback continues while the window is hidden
-- Current title, artist, and play state through the browser's MPRIS service
-- Omarchy-style now-playing row with scrolling track and artist metadata
-- Monochrome note and animated playing states that inherit the active bar theme
-- Dedicated browser profile, so Apple Music has a stable session and cannot borrow metadata from unrelated tabs
-- Runtime-only Hyprland rules; no edits to user configuration
-- Multi-monitor-aware positioning with small-screen clamping
-- Live colors from the active Omarchy popup palette, including light and dark themes
-- Queue-first compact view with artwork, progress, playback controls, and live Up Next selection
-- Explicit, persistent switch between the compact queue and the full Apple Music interface
-- Compact search action that opens Apple Music's native catalog search
-- A fixed 90% profile default that keeps Apple's desktop layouts active at dropdown width without Chromium's zoom popup
+- Full `music.apple.com` interface in a bar-anchored Chromium app window
+- Compact Queue view with artwork, progress, playback controls, live Up Next selection, and a real system-audio spectrum clipped into Omarchy's pixel wordmark
+- Explicit, persistent **Full** / **Queue** switch plus a shared catalog-search action
+- Compact monochrome bar icon or inline now-playing controls, switchable without opening settings
+- Playback continues when the dropdown is hidden on its named Hyprland special workspace
+- Dropdown positioning for bars on every edge, with multi-monitor geometry and small-screen clamping
+- Pointer remains on the bar when the dropdown receives focus
+- Live colors from the active Omarchy theme, including fast transitions between light and dark palettes
+- Dedicated Chromium profile for a stable Apple session and isolated media metadata
+- Runtime-only Hyprland rules, with no edits to the user's compositor configuration
+- Fixed 90% profile zoom that keeps Apple's desktop layout active at dropdown width without Chromium's zoom popup
 
 ## Install
 
@@ -28,51 +24,73 @@ The plugin launches Apple Music in a dedicated, persistent Chromium profile and 
 omarchy plugin add https://github.com/melonamin/omarchy-apple-music.git --enable
 ```
 
-Omarchy ships Chromium, `jq`, Hyprland, and Quickshell, so the plugin has no additional package dependencies. The dedicated app uses Chromium because it supports the bundled unpacked theme extension. Any unpacked extensions already configured in `chromium-flags.conf` remain enabled alongside it.
+The shell discovers the plugin and adds its widget to the right side of the bar. Sign in to Apple Music the first time the dropdown opens.
 
-Apple Music playback depends on the selected browser's codec and DRM support. Plain Chromium installations without a Widevine CDM may load the site but refuse protected tracks.
-
-## Use
-
-- Compact mode, left or right click: open or hide Apple Music
-- Mini-player mode, left click: play or pause
-- Mini-player mode, right click: open or hide Apple Music
-- Middle click: toggle compact icon and mini-player modes
-- Scroll up/down: previous or next track
-- Click another window: hide Apple Music while leaving it running
-- Change the Omarchy theme: keep an open Apple Music dropdown visible and focused
-- In the dropdown, click **Full** or **Queue view** to switch interfaces; the selection is remembered
-
-The default presentation is the fixed-width monochrome icon. Middle-click it to reveal the persistent mini-player, or set the mode explicitly:
-
-```bash
-omarchy bar set melonamin.apple-music display player
-```
-
-Restore compact mode:
-
-```bash
-omarchy bar set melonamin.apple-music display icon
-```
-
-The mini-player mirrors Omarchy's built-in now-playing row. Left-click it to play or pause, right-click it to open Apple Music, middle-click it to return to compact mode, and scroll for previous or next. The legacy `status` setting remains an alias for `player`.
-
-## State and privacy
-
-The browser profile lives at `$XDG_DATA_HOME/omarchy-apple-music/chromium`, falling back to `~/.local/share/omarchy-apple-music/chromium`. It contains the Apple login session and is deliberately retained when the plugin is removed.
-
-The plugin copies its bundled Manifest V3 extension to `$XDG_DATA_HOME/omarchy-apple-music/extension`. The extension runs only on `https://music.apple.com/*` and requests local extension storage solely to remember the selected Full/Queue view. It reads a local palette file generated by the plugin and uses Apple Music's page-local MusicKit player to expose sanitized playback state to the compact interface. Account and authorization data never cross that bridge. The Omarchy bar continues to use Chromium's standard MPRIS interface.
-
-Theme changes are applied to an already-open Apple Music window in roughly a tenth of a second, keeping it visually aligned with Omarchy's transition. If the dropdown was parked while the theme changed, its palette is also refreshed immediately when the window becomes visible or focused again. The first plugin update that adds theming requires one restart of the dedicated Chromium process so Chromium can load the extension.
-
-To remove the plugin:
+To remove it:
 
 ```bash
 omarchy plugin remove melonamin.apple-music
-hyprctl reload
+hyprctl reload      # drops the runtime-only window rule
 ```
 
-The reload removes the runtime-only window rule. Delete the browser-profile directory separately if you also want to remove the saved Apple session.
+The dedicated browser profile is retained so uninstalling or updating the plugin does not destroy the saved Apple session. Delete `$XDG_DATA_HOME/omarchy-apple-music` separately if you also want to remove that local state.
+
+## Requirements
+
+Omarchy 4 (Quattro) or newer, running `omarchy-shell` on Hyprland.
+
+The stock Omarchy installation already provides Chromium, `jq`, Hyprland, Quickshell, PipeWire's Pulse compatibility layer, `parec`, `od`, and `awk`, so the plugin adds no package dependencies. Apple Music playback still depends on Chromium's codec and DRM support; a build without a working Widevine CDM may load the site but refuse protected tracks.
+
+## Use
+
+| Input | Compact icon | Mini-player |
+|---|---|---|
+| Left click | Open or hide Apple Music | Play or pause |
+| Right click | Open or hide Apple Music | Open or hide Apple Music |
+| Middle click | Switch to mini-player | Switch to compact icon |
+| Scroll up / down | Previous / next track | Previous / next track |
+
+Clicking another window hides the dropdown without interrupting playback. Inside the dropdown, **Full** opens Apple's complete interface and **Queue** opens the compact listening view; the choice is remembered explicitly between sessions.
+
+The Queue visualizer follows play and pause state and uses the active theme accent. While the dropdown is visible and Apple Music is playing, it monitors only the dedicated Chromium app's PipeWire stream, reduces it to 32 frequency bands, and draws those bands inside the official Omarchy wordmark. If that stream is unavailable, the wordmark falls back to a synthetic animation.
+
+## Bar setting
+
+The default presentation is the fixed-width monochrome icon. Set the presentation directly with `omarchy bar set`:
+
+```bash
+omarchy bar set melonamin.apple-music display player
+omarchy bar set melonamin.apple-music display icon
+```
+
+`display` accepts `icon` or `player`; the legacy value `status` remains an alias for `player`.
+
+## State and privacy
+
+The browser profile lives at `$XDG_DATA_HOME/omarchy-apple-music/chromium`, falling back to `~/.local/share/omarchy-apple-music/chromium`. It contains the Apple login session and normal site data for the dedicated app.
+
+The plugin stages its bundled Manifest V3 extension under `$XDG_RUNTIME_DIR/omarchy-apple-music/extension`, falling back to the plugin's data directory only when no runtime directory exists. The extension runs only on `https://music.apple.com/*`, requests local extension storage only to remember the selected Full/Queue view, and reads local theme and spectrum files generated by the plugin. High-frequency spectrum updates therefore stay in tmpfs instead of writing to persistent storage.
+
+The compact view uses Apple Music's page-local MusicKit player to expose sanitized playback state: title, artist, album, artwork URL, duration, position, play state, repeat, shuffle, and queue entries. Account credentials and authorization tokens never cross that bridge. The bar uses Chromium's standard MPRIS interface.
+
+MPRIS carries controls and metadata, not audio samples. For the visualizer, the service finds the PipeWire/Pulse sink input whose process belongs to the dedicated Apple Music Chromium tree and monitors that stream directly. PCM is downmixed in memory to 24 kHz mono, transformed into 32 normalized bands, and immediately discarded. Only the numeric band levels are published to the runtime extension; no PCM is persisted, sent over the network, or mixed with other applications' audio. Capture starts only while the dropdown is open and playback is active, and stops when it is hidden or paused.
+
+## How it works
+
+```text
+Omarchy bar widget ──▶ Service.qml ──▶ Hyprland-managed Chromium app
+        ▲                    │                       │
+        └──── MPRIS state ───┘              bundled MV3 extension
+                             │                       │
+                             ├── theme palette ──────┤
+                             │                       └── local MusicKit state
+                             │
+                             └── PipeWire app monitor ──▶ 32-band runtime spectrum
+```
+
+The Chromium window remains alive on `special:melonamin-apple-music` when hidden. Showing it moves and focuses the same window at the current bar edge; hiding it parks the window again, so playback and the signed-in session continue uninterrupted.
+
+Theme changes are published as a small local palette and applied to an open dropdown during Omarchy's own transition. The extension and spectrum analyzer are bundled with the plugin and are never downloaded at runtime.
 
 ## IPC
 
@@ -94,12 +112,16 @@ node --test tests/model.test.js tests/extension.test.js tests/player-model.test.
 tests/integration.sh
 ```
 
-The model suites cover window matching, scaled monitor geometry, every bar edge, small displays, PID-scoped MPRIS selection, palette validation, and derived interaction colors. The integration script validates both manifests and reads live shell/compositor state; by default it stays hands-off and never launches or closes Apple Music.
+The model suites cover window matching, scaled monitor geometry, every bar edge, small displays, PID-scoped MPRIS selection, palette validation, player-state normalization, and MusicKit command routing. The spectrum test feeds a known 1 kHz tone through the analyzer and verifies its dominant band. The integration script validates both manifests and inspects live shell/compositor state without launching or closing Apple Music.
+
+An opt-in end-to-end run uses a disposable browser profile, parks its window on the special workspace, and closes it again. It skips itself if a real Apple Music window is open.
 
 ```bash
 OMARCHY_APPLE_MUSIC_E2E=1 tests/integration.sh
 ```
 
-The opt-in run additionally launches a disposable Apple Music window in a temporary browser profile, parks it on the special workspace, and closes it again. It skips itself when an Apple Music window is already open, so it never disturbs a real session.
+## License
+
+MIT
 
 Apple and Apple Music are trademarks of Apple Inc. This project is independent and is not endorsed by or affiliated with Apple.
