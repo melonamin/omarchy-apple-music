@@ -15,6 +15,23 @@ bash -n "$ROOT/control.sh"
 bash -n "$ROOT/spectrum.sh"
 pass "control script parses"
 
+node - "$ROOT/BarWidget.qml" <<'NODE'
+const assert = require("node:assert")
+const fs = require("node:fs")
+
+const source = fs.readFileSync(process.argv[2], "utf8")
+const label = source.match(/Text\s*\{\s*id:\s*labelText\b[\s\S]*?\n\s*\}/)
+assert.ok(label, "bar metadata label is missing")
+assert.match(label[0], /textFormat:\s*Text\.PlainText\b/,
+  "bar metadata must render as plain text")
+
+const tooltip = source.match(/onEntered:[\s\S]*?onExited:/)
+assert.ok(tooltip, "bar tooltip handler is missing")
+assert.doesNotMatch(tooltip[0], /statusText|root\.(?:title|artist)/,
+  "untrusted MPRIS metadata must not reach the shared tooltip renderer")
+NODE
+pass "MPRIS metadata is confined to a plain-text renderer"
+
 plugin_version=$(jq -r '.version // empty' "$ROOT/manifest.json")
 extension_version=$(jq -r '.version // empty' "$ROOT/extension/chromium-manifest.json")
 [[ -n $plugin_version ]] || fail "plugin manifest has no version"

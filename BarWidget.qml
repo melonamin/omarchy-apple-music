@@ -153,6 +153,7 @@ BarWidget {
         Text {
           id: labelText
           text: root.statusText
+          textFormat: Text.PlainText
           color: root.bar ? root.bar.barForeground : Color.foreground
           opacity: root.hasMedia ? 1.0 : 0.58
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
@@ -193,7 +194,7 @@ BarWidget {
 
     onEntered: if (root.bar) root.bar.showTooltip(root,
       root.playerMode
-        ? root.statusText + " — Left-click to play/pause; middle-click for compact mode; right-click for Apple Music"
+        ? "Apple Music — Left-click to play/pause; middle-click for compact mode; right-click to open"
         : "Apple Music — Left or right-click to open; middle-click for now playing")
     onExited: if (root.bar) root.bar.hideTooltip(root)
   }
