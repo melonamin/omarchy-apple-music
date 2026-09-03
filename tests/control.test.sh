@@ -32,10 +32,13 @@ PATH="$TEST_DIR:$PATH" MOCK_CLIENT_WORKSPACE="2" \
 
 : >"$MOCK_LOG"
 PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" show 0xabc DP-5 1200 80 900 700
+grep -F 'hl.dsp.window.float({ window = "address:0xabc", action = "enable" })' "$MOCK_LOG" >/dev/null
+! grep -F 'action = "set"' "$MOCK_LOG" >/dev/null
 grep -F 'hl.dsp.window.move({ window = "address:0xabc", workspace = "2", follow = false })' "$MOCK_LOG" >/dev/null
 grep -F 'hl.dsp.window.resize({ window = "address:0xabc", x = 900, y = 700, relative = false })' "$MOCK_LOG" >/dev/null
 grep -F 'hl.dsp.window.move({ window = "address:0xabc", x = 1200, y = 80, relative = false })' "$MOCK_LOG" >/dev/null
 grep -F 'hl.dsp.cursor.move({ x = 2100, y = 13 })' "$MOCK_LOG" >/dev/null
+[[ $(sed -n '1p' "$MOCK_LOG") == *'hl.dsp.window.float('* ]]
 
 : >"$MOCK_LOG"
 PATH="$TEST_DIR:$PATH" "$ROOT/control.sh" hide 0xabc

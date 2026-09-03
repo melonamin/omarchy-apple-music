@@ -229,6 +229,13 @@ show_window() {
     'first(.[] | select(.name == $screen) | .activeWorkspace.name) // empty')
   [[ -n $workspace && $workspace != *$'\n'* && $workspace != *'"'* && $workspace != *'\\'* ]] || return 2
 
+  # Static float rules only apply when a window is created. Reassert the
+  # state here so a persistent browser client also recovers after a rule race
+  # or Hyprland config reload.
+  # Hyprland's Lua toggle parser calls the idempotent action "enable".
+  # Unknown values fall back to "toggle", so do not use the documented
+  # "set" spelling here on Hyprland 0.56.
+  hypr_call dispatch "hl.dsp.window.float({ window = \"address:$address\", action = \"enable\" })"
   hypr_call dispatch "hl.dsp.window.move({ window = \"address:$address\", workspace = \"$workspace\", follow = false })"
 
   if [[ -n $current ]]; then

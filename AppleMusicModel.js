@@ -76,6 +76,15 @@ function monitorFor(monitors, name) {
   return list.length > 0 ? list[0] : null
 }
 
+function dropdownSize(client) {
+  var prior = client && Array.isArray(client.size) ? client.size : []
+  var canReuse = client && client.floating === true
+  return {
+    width: canReuse && number(prior[0], 0) >= 480 ? number(prior[0], 960) : 960,
+    height: canReuse && number(prior[1], 0) >= 360 ? number(prior[1], 720) : 720
+  }
+}
+
 function monitorWorkArea(monitor) {
   if (!monitor) return null
   var scale = Math.max(0.1, number(monitor.scale, 1))
@@ -160,6 +169,7 @@ if (typeof module !== "undefined") {
     shouldDismissWindow: shouldDismissWindow,
     focusDisposition: focusDisposition,
     monitorFor: monitorFor,
+    dropdownSize: dropdownSize,
     monitorWorkArea: monitorWorkArea,
     placement: placement,
     pidFromMprisName: pidFromMprisName,

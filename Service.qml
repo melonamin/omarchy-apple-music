@@ -72,6 +72,9 @@ Item {
   property string queuedIntent: ""
   property var queuedAnchor: null
   property bool syncQueued: false
+  property bool launchAfterRules: false
+  property var rulesLaunchAnchor: null
+  property bool forceRulesAfterCurrent: false
   property int launchAttempts: 0
   property var launchAnchor: null
   property string actionKind: ""
@@ -228,6 +231,14 @@ Item {
 
   function launch(anchor) {
     if (launching || launchProc.running) return
+    if (!rulesInstalled) {
+      launchAfterRules = true
+      rulesLaunchAnchor = anchor || lastAnchor
+      // A failed eval can leave the Lua guard set even though no rule exists.
+      // Force the retry so the pending launch cannot accept that stale guard.
+      installRules(true)
+      return
+    }
     syncTheme(false)
     launching = true
     lastError = ""
@@ -247,10 +258,8 @@ Item {
       barPosition: "top"
     })
     var monitor = Model.monitorFor(availableMonitors, actualAnchor.screenName)
-    var priorSize = client && Array.isArray(client.size) ? client.size : []
-    var desiredWidth = Number(priorSize[0]) >= 480 ? Number(priorSize[0]) : 960
-    var desiredHeight = Number(priorSize[1]) >= 360 ? Number(priorSize[1]) : 720
-    var rect = Model.placement(actualAnchor, monitor, desiredWidth, desiredHeight, 12)
+    var desiredSize = Model.dropdownSize(client)
+    var rect = Model.placement(actualAnchor, monitor, desiredSize.width, desiredSize.height, 12)
     var address = Model.normalizeAddress(client && client.address)
     if (!monitor || !rect || !address) {
       notifyFailure("Could not place the Apple Music window")
@@ -313,7 +322,11 @@ Item {
   }
 
   function installRules(force) {
-    if (!controlPath || !rulesPath || rulesProc.running) return
+    if (!controlPath || !rulesPath) return
+    if (rulesProc.running) {
+      if (force) forceRulesAfterCurrent = true
+      return
+    }
     rulesProc.command = [controlPath, "rules", rulesPath, force ? "true" : "false"]
     rulesProc.running = true
   }
@@ -362,6 +375,7 @@ Item {
     }
 
     if (name === "configreloaded") {
+      rulesInstalled = false
       ruleReload.restart()
       return
     }
@@ -415,14 +429,18 @@ Item {
   }
 
   function initialize() {
-    if (!controlPath || initializedFor === controlPath) return
-    initializedFor = controlPath
+    if (!controlPath || !rulesPath || initializedFor === sourceDir) return
+    initializedFor = sourceDir
     syncTheme(true)
     installRules(false)
     requestState("sync", null)
   }
 
-  onControlPathChanged: initialize()
+  // The manifest updates both derived paths, but their bindings are not
+  // guaranteed to settle in the same turn. Defer and listen to both so an
+  // early controlPath change cannot permanently skip rule installation.
+  onControlPathChanged: Qt.callLater(root.initialize)
+  onRulesPathChanged: Qt.callLater(root.initialize)
   onSpectrumWantedChanged: spectrumSync.restart()
   onBrowserPidChanged: spectrumSync.restart()
 
@@ -620,8 +638,33 @@ Item {
   Process {
     id: rulesProc
     onExited: function(code) {
+      var forceAgain = root.forceRulesAfterCurrent
+      root.forceRulesAfterCurrent = false
+
+      if (forceAgain) {
+        root.rulesInstalled = false
+        if (code !== 0)
+          console.warn("apple-music: initial runtime window rule install failed; retrying")
+        Qt.callLater(function() { root.installRules(true) })
+        return
+      }
+
       root.rulesInstalled = code === 0
-      if (code !== 0) console.warn("apple-music: could not install runtime window rules")
+      if (code !== 0) {
+        console.warn("apple-music: could not install runtime window rules")
+        if (root.launchAfterRules)
+          root.notifyFailure("Could not prepare the Apple Music dropdown")
+        root.launchAfterRules = false
+        root.rulesLaunchAnchor = null
+        return
+      }
+
+      if (root.launchAfterRules) {
+        var anchor = root.rulesLaunchAnchor
+        root.launchAfterRules = false
+        root.rulesLaunchAnchor = null
+        Qt.callLater(function() { root.launch(anchor) })
+      }
     }
   }
 

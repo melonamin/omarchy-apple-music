@@ -153,6 +153,21 @@ test("monitor lookup prefers the named output and falls back safely", () => {
   assert.equal(M.monitorFor([], "missing"), null)
 })
 
+test("only floating clients contribute a remembered dropdown size", () => {
+  assert.deepEqual(M.dropdownSize({ floating: true, size: [900, 700] }), {
+    width: 900,
+    height: 700
+  })
+  assert.deepEqual(M.dropdownSize({ floating: false, size: [2538, 1392] }), {
+    width: 960,
+    height: 720
+  })
+  assert.deepEqual(M.dropdownSize({ floating: true, size: [300, 200] }), {
+    width: 960,
+    height: 720
+  })
+})
+
 test("MPRIS selection is scoped to the browser process", () => {
   const apple = { dbusName: "org.mpris.MediaPlayer2.chromium.instance4242" }
   const other = { dbusName: "org.mpris.MediaPlayer2.chromium.instance99" }
