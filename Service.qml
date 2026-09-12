@@ -12,7 +12,8 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string sourceDir: manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
+  // omarchy 4.0.3 strips __sourceDir from third-party manifests; resolve from our own URL.
+  readonly property string sourceDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
   readonly property string controlPath: sourceDir ? sourceDir + "/control.sh" : ""
   readonly property string rulesPath: sourceDir ? sourceDir + "/hypr/apple-music.lua" : ""
 
