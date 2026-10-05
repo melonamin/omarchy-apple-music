@@ -86,10 +86,17 @@ else
 fi
 
 if status=$(omarchy-shell apple-music status 2>/dev/null); then
-  jq -e '.rulesInstalled | type == "boolean"' <<<"$status" >/dev/null
+  jq -e '.sourceDir | type == "string" and length > 0' <<<"$status" >/dev/null ||
+    fail "installed service cannot locate its bundled files"
   jq -e '.opened | type == "boolean"' <<<"$status" >/dev/null
-  jq -e '.themeReady | type == "boolean"' <<<"$status" >/dev/null
-  pass "installed service responds"
+  for (( attempt = 0; attempt < 20; attempt++ )); do
+    jq -e '.rulesInstalled == true and .themeReady == true' <<<"$status" >/dev/null && break
+    sleep 0.25
+    status=$(omarchy-shell apple-music status)
+  done
+  jq -e '.rulesInstalled == true and .themeReady == true' <<<"$status" >/dev/null ||
+    fail "installed service did not initialize its window rules and theme: $status"
+  pass "installed service locates its files and initializes window rules and theme"
 else
   skip "plugin is not enabled in the running shell"
 fi

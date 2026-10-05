@@ -12,7 +12,9 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string sourceDir: manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
+  // Third-party manifests omit host-private paths. Resolve bundled files
+  // relative to this component, including percent-encoded installation paths.
+  readonly property string sourceDir: decodeURIComponent(String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "")).replace(/\/$/, "")
   readonly property string controlPath: sourceDir ? sourceDir + "/control.sh" : ""
   readonly property string rulesPath: sourceDir ? sourceDir + "/hypr/apple-music.lua" : ""
 
